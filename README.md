@@ -34,8 +34,8 @@
 
 1.  **Клонируйте репозиторий:**
     ```bash
-    git clone https://github.com/
-    cd tele-tube-sim
+    git clone https://github.com/ReNothingg/TeleTube
+    cd TeleTube
     ```
 
 2.  **Создайте и активируйте виртуальное окружение (рекомендуется):**
