@@ -1,7 +1,6 @@
 # 🤖 TeleTube - Telegram Бот-Симулятор Блогера 🎮
 
 ![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg)
-[![Telegram Bot API](https://img.shields.io/badge/Telegram%20Bot%20API- powering%20this%20bot-blue.svg)](https://core.telegram.org/bots/api)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 **TeleTube** — это увлекательный Telegram-бот, где вы можете примерить на себя роль популярного "TeleTube" блогера! 🚀 Публикуйте "видео", набирайте подписчиков, зарабатывайте внутриигровую валюту, открывайте достижения, соревнуйтесь с друзьями и станьте настоящей звездой TeleTube!
