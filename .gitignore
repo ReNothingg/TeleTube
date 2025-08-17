@@ -3,3 +3,4 @@ __pycache__/
 .venv
 database.json
 *.png
+test_bot.py

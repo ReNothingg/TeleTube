@@ -265,7 +265,7 @@ def schedule_cooldown_notification(bot: Bot, user_id: int, chat_id: int, cooldow
         u['cooldown_notification_task'] = {'ends_at': cooldown_end_time.timestamp()}
         asyncio.create_task(save_data_async(data))
 
-async def cmd_start(message: types.Message, bot: Bot):
+async def cmd_start(message: types.Message, bot: Bot, **kwargs):
     data = load_data()
     ud = get_user_data(message.from_user.id, data, message.from_user.username or message.from_user.first_name)
     if ud.get('video_count', 0) == 0:
@@ -280,7 +280,7 @@ async def cmd_start(message: types.Message, bot: Bot):
     await message.answer(f"🚀 Привет, {message.from_user.first_name}! Ты в игре {BOT_NAME}!\nИспользуй /help или кнопки.", reply_markup=kb)
 
 @require_subscription(require=True)
-async def cmd_addvideo(message: types.Message, bot: Bot):
+async def cmd_addvideo(message: types.Message, bot: Bot, **kwargs):
     args = message.text.split(maxsplit=1)
     if len(args) < 2:
         await message.answer("Укажи название: /addvideo Название")
@@ -353,7 +353,7 @@ async def cmd_addvideo(message: types.Message, bot: Bot):
     await save_data_async(data)
     await message.answer("\n".join(msg_parts))
 
-async def cmd_leaderboard(message: types.Message, bot: Bot):
+async def cmd_leaderboard(message: types.Message, bot: Bot, **kwargs):
     data = load_data()
     if not data:
         await message.answer("🏆 В боте пока нет данных.")
@@ -367,7 +367,7 @@ async def cmd_leaderboard(message: types.Message, bot: Bot):
         shown += 1
     await message.answer(msg)
 
-async def cmd_leaderboardpic(message: types.Message, bot: Bot):
+async def cmd_leaderboardpic(message: types.Message, bot: Bot, **kwargs):
     data = load_data()
     if not data:
         await message.answer("📊 Данных нет.")
@@ -400,7 +400,7 @@ async def cmd_leaderboardpic(message: types.Message, bot: Bot):
             try: os.remove(LEADERBOARD_IMAGE_FILE)
             except: pass
 
-async def cmd_myprofile(message: types.Message, bot: Bot):
+async def cmd_myprofile(message: types.Message, bot: Bot, **kwargs):
     data = load_data()
     ud = get_user_data(message.from_user.id, data, message.from_user.username or message.from_user.first_name)
     uname = ud.get('username', message.from_user.first_name)
@@ -434,7 +434,7 @@ async def cmd_myprofile(message: types.Message, bot: Bot):
     await save_data_async(data)
     await message.answer("\n".join(out), parse_mode="HTML")
 
-async def cmd_achievements(message: types.Message, bot: Bot):
+async def cmd_achievements(message: types.Message, bot: Bot, **kwargs):
     data = load_data()
     ud = get_user_data(message.from_user.id, data, message.from_user.username or message.from_user.first_name)
     unlocked = ud.get('achievements_unlocked', [])
@@ -457,7 +457,7 @@ async def cmd_achievements(message: types.Message, bot: Bot):
     await save_data_async(data)
     await message.answer(txt, parse_mode="HTML")
 
-async def cmd_daily(message: types.Message, bot: Bot):
+async def cmd_daily(message: types.Message, bot: Bot, **kwargs):
     data = load_data()
     ud = get_user_data(message.from_user.id, data, message.from_user.username or message.from_user.first_name)
     today_s = date.today().isoformat()
@@ -486,7 +486,7 @@ async def cmd_daily(message: types.Message, bot: Bot):
         res += "\n" + "\n".join(ach)
     await message.answer(res)
 
-async def cmd_shop(message: types.Message, bot: Bot):
+async def cmd_shop(message: types.Message, bot: Bot, **kwargs):
     data = load_data()
     ud = get_user_data(message.from_user.id, data, message.from_user.username or message.from_user.first_name)
     bal = ud.get('currency', 0)
@@ -499,7 +499,7 @@ async def cmd_shop(message: types.Message, bot: Bot):
     await save_data_async(data)
     await message.answer(txt, parse_mode="HTML", reply_markup=markup)
 
-async def cb_shop_buy(query: types.CallbackQuery, bot: Bot):
+async def cb_shop_buy(query: types.CallbackQuery, bot: Bot, **kwargs):
     await query.answer()
     data = load_data()
     user_id = query.from_user.id
@@ -542,7 +542,7 @@ async def cb_shop_buy(query: types.CallbackQuery, bot: Bot):
     await save_data_async(data)
     await query.message.edit_text(app_msg)
 
-async def cmd_help(message: types.Message, bot: Bot):
+async def cmd_help(message: types.Message, bot: Bot, **kwargs):
     text = (
         f"🌟 <b>{BOT_NAME}!</b>\n\n"
         "Публикуй видео, копи валюту и прокачивайся!\n\n"
@@ -563,7 +563,7 @@ async def cmd_help(message: types.Message, bot: Bot):
     )
     await message.answer(text, parse_mode="HTML")
 
-async def cmd_checksub(message: types.Message, bot: Bot):
+async def cmd_checksub(message: types.Message, bot: Bot, **kwargs):
     if not CHANNEL_ID:
         await message.answer("❌ CHANNEL_ID не настроен в .env файле")
         return
@@ -592,7 +592,7 @@ async def cmd_checksub(message: types.Message, bot: Bot):
             await message.answer(f"❌ Ошибка при проверке подписки: {e}")
         logger.error(f"Subscription check test failed: {e}")
 
-async def cmd_disable_sub_check(message: types.Message, bot: Bot):
+async def cmd_disable_sub_check(message: types.Message, bot: Bot, **kwargs):
     if message.from_user.id != CREATOR_ID:
         await message.answer("⛔ Только создатель бота может отключить проверку подписки")
         return
@@ -604,7 +604,7 @@ async def cmd_disable_sub_check(message: types.Message, bot: Bot):
     await message.answer(f"✅ Проверка подписки отключена!\nБыло: {old_channel}\nТеперь: отключено")
     logger.info(f"Subscription check disabled by admin {message.from_user.id}. Was: {old_channel}")
 
-async def cmd_enable_sub_check(message: types.Message, bot: Bot):
+async def cmd_enable_sub_check(message: types.Message, bot: Bot, **kwargs):
     if message.from_user.id != CREATOR_ID:
         await message.answer("⛔ Только создатель бота может включить проверку подписки")
         return
@@ -628,7 +628,7 @@ async def admin_check_and_get(message: types.Message) -> Optional[str]:
         return None
     return "ok"
 
-async def admin_add_currency(message: types.Message, bot: Bot):
+async def admin_add_currency(message: types.Message, bot: Bot, **kwargs):
     ok = await admin_check_and_get(message)
     if not ok: return
     parts = message.text.split()
@@ -663,7 +663,7 @@ async def admin_add_currency(message: types.Message, bot: Bot):
     await save_data_async(data)
     await message.answer(f"Баланс юзера обновлён: {data[found]['currency']} {DEFAULT_CURRENCY_NAME}")
 
-async def admin_add_subs(message: types.Message, bot: Bot):
+async def admin_add_subs(message: types.Message, bot: Bot, **kwargs):
     ok = await admin_check_and_get(message)
     if not ok: return
     parts = message.text.split()
@@ -698,7 +698,7 @@ async def admin_add_subs(message: types.Message, bot: Bot):
     await save_data_async(data)
     await message.answer(f"Пдп юзера обновлены: {data[found]['subscribers']}")
 
-async def admin_delete_db(message: types.Message, bot: Bot):
+async def admin_delete_db(message: types.Message, bot: Bot, **kwargs):
     ok = await admin_check_and_get(message)
     if not ok: return
     if os.path.exists(DATABASE_FILE):
@@ -710,7 +710,7 @@ async def admin_delete_db(message: types.Message, bot: Bot):
     else:
         await message.answer("Файл БД не найден.")
 
-async def admin_stats(message: types.Message, bot: Bot):
+async def admin_stats(message: types.Message, bot: Bot, **kwargs):
     ok = await admin_check_and_get(message)
     if not ok: return
     data = load_data()
