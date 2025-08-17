@@ -2,5 +2,4 @@ __pycache__/
 .env
 .venv
 database.json
-database.txt
 *.png

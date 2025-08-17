@@ -1,8 +1,6 @@
-aiogram>=3.0.0
 python-dotenv
 matplotlib
 pandas
 numpy
-redis
-aiofiles
-asyncio-mqtt
+aiogram==3.0.0
+pip install "aiogram>=3.2.0"
