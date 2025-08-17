@@ -17,7 +17,7 @@ import pandas as pd
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import (
     ReplyKeyboardMarkup, KeyboardButton,
-    InlineKeyboardButton, InlineKeyboardMarkup, InputFile
+    InlineKeyboardButton, InlineKeyboardMarkup, FSInputFile
 )
 from aiogram.filters import Command
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
@@ -148,29 +148,60 @@ def load_keywords(filename: str = KEYWORDS_FILE) -> List[str]:
 def evaluate_video_popularity(video_title: str, base_popularity_modifier: int = 0, user_subs: int = 0) -> int:
     title = video_title.strip().lower()
     keywords = load_keywords()
+    
     keyword_bonus = sum(KEYWORD_BONUS_POINTS for k in keywords if k in title)
-    words = max(1, len(title.split()))
-    length_bonus = min(3, (words // 4))
-    volatility = 1.0 + max(0, 10 - min(user_subs, 100)) / 20.0
-    rand = random.randint(POPULARITY_RANDOM_MIN, POPULARITY_RANDOM_MAX)
-    raw = keyword_bonus + length_bonus + rand + base_popularity_modifier
-    adjusted = int(round(raw * volatility))
-    return max(-50, min(500, adjusted))
+    
+    words = len(title.split())
+    length_bonus = min(5, words // 2)
+    
+    title_quality = 0
+    if any(word in title for word in ['новый', 'лучший', 'топ', 'обзор', 'туториал', 'гайд']):
+        title_quality += 3
+    if any(word in title for word in ['2024', '2025', 'новинка', 'эксклюзив']):
+        title_quality += 2
+    if len(title) > 20:
+        title_quality += 1
+    
+    volatility = 1.0 + max(0, 20 - min(user_subs, 200)) / 40.0
+    
+    base_score = keyword_bonus + length_bonus + title_quality + base_popularity_modifier
+    
+    rand_factor = random.randint(POPULARITY_RANDOM_MIN, POPULARITY_RANDOM_MAX)
+    
+    raw_score = base_score + rand_factor
+    
+    adjusted_score = int(round(raw_score * volatility))
+    
+    final_score = max(-30, min(100, adjusted_score))
+    
+    return final_score
 
 def get_random_event(user_subscribers: int) -> Optional[Dict[str, Any]]:
     r = random.random()
-    if r < 0.03 and user_subscribers >= 5:
-        bonus = random.randint(20, 60)
+    
+    if r < 0.05 and user_subscribers >= 10:
+        bonus = random.randint(25, 75)
         return {"type": "event_modifier", "modifier": bonus, "target": "next_video_popularity",
-                "message": f"🎉 Вирусный всплеск! +{bonus} к популярности следующего видео!"}
-    if 0.03 <= r < 0.12:
-        bonus = random.randint(3, 7)
+                "message": f"🎉 Вирусный взрыв! +{bonus} к популярности следующего видео!"}
+    
+    if 0.05 <= r < 0.15:
+        bonus = random.randint(5, 15)
         return {"type": "event_modifier", "modifier": bonus, "target": "next_video_popularity",
                 "message": f"✨ Местный хайп: +{bonus} к следующему видео."}
-    if 0.12 <= r < 0.16 and user_subscribers > 20:
-        malus = random.randint(2, 6)
+    
+    if 0.15 <= r < 0.20 and user_subscribers > 30:
+        malus = random.randint(3, 8)
         return {"type": "event_modifier", "modifier": -malus, "target": "next_video_popularity",
                 "message": f"📉 Технические проблемы: -{malus} к следующему видео."}
+    
+    if 0.20 <= r < 0.25 and user_subscribers >= 50:
+        return {"type": "currency_bonus", "amount": random.randint(10, 30),
+                "message": f"💰 Бонус за активность: +{random.randint(10, 30)} {DEFAULT_CURRENCY_NAME}!"}
+    
+    if 0.25 <= r < 0.30 and user_subscribers >= 100:
+        return {"type": "cooldown_reduction", "hours": random.randint(1, 3),
+                "message": f"⚡ Ускорение: кулдаун уменьшен на {random.randint(1, 3)} часа!"}
+    
     return None
 
 async def check_and_grant_achievements(user_data: Dict[str, Any], bot: Bot, chat_id: int) -> List[str]:
@@ -343,8 +374,20 @@ async def cmd_addvideo(message: types.Message, bot: Bot, **kwargs):
 
     new_ev = get_random_event(ud.get('subscribers', 0))
     if new_ev:
-        ud['active_event'] = new_ev
-        msg_parts.append(f"\n🔔 Событие: {new_ev['message']}")
+        if new_ev['type'] == 'currency_bonus':
+            bonus_amount = new_ev['amount']
+            ud['currency'] = ud.get('currency', 0) + bonus_amount
+            msg_parts.append(f"\n🔔 Событие: {new_ev['message']}")
+        elif new_ev['type'] == 'cooldown_reduction':
+            reduction_hours = new_ev['hours']
+            current_cooldown = ud.get('last_used_timestamp', 0.0)
+            if current_cooldown > 0:
+                new_cooldown = current_cooldown - (reduction_hours * 3600)
+                ud['last_used_timestamp'] = max(0, new_cooldown)
+            msg_parts.append(f"\n🔔 Событие: {new_ev['message']}")
+        else:
+            ud['active_event'] = new_ev
+            msg_parts.append(f"\n🔔 Событие: {new_ev['message']}")
 
     ach_msgs = await check_and_grant_achievements(ud, bot, message.chat.id)
     if ach_msgs:
@@ -359,7 +402,7 @@ async def cmd_leaderboard(message: types.Message, bot: Bot, **kwargs):
         await message.answer("🏆 В боте пока нет данных.")
         return
     users = sorted(data.values(), key=lambda u: u.get('subscribers', 0), reverse=True)
-    msg = "🏆 <b>Топеры:</b>\n\n"
+    msg = "🏆 **Топеры:**\n\n"
     shown = 0
     for u in users:
         if shown >= 15: break
@@ -386,12 +429,12 @@ async def cmd_leaderboardpic(message: types.Message, bot: Bot, **kwargs):
     fig, ax = plt.subplots(figsize=(10, 7))
     wedges, texts, autotexts = ax.pie(subs, autopct=lambda p: f'{p:.1f}%' if p > 3 else '', startangle=140)
     ax.legend(wedges, [f"{n} ({s})" for n, s in zip(names, subs)], title="Топ", loc="center left", bbox_to_anchor=(1, 0, 0.5, 1))
-    ax.set_title(f"🏆 Топ {BOT_NAME}еров")
+    ax.set_title(f"Топ {BOT_NAME}еров")
     plt.tight_layout(rect=[0, 0, 0.75, 1])
     try:
         plt.savefig(LEADERBOARD_IMAGE_FILE, dpi=150, bbox_inches='tight')
         plt.close(fig)
-        await message.answer_photo(photo=InputFile(LEADERBOARD_IMAGE_FILE))
+        await message.answer_photo(photo=FSInputFile(LEADERBOARD_IMAGE_FILE))
     except Exception as e:
         logger.exception("leaderboard pic error: %s", e)
         await message.answer("Ошибка генерации картинки.")
@@ -409,7 +452,7 @@ async def cmd_myprofile(message: types.Message, bot: Bot, **kwargs):
     curr = ud.get('currency', 0)
     tot = ud.get('total_subs_from_videos', 0)
     avg = (tot / vids) if vids > 0 else 0.0
-    out = [f"👤 <b>Твой профиль, {uname}:</b>",
+    out = [f"👤 **Твой профиль, {uname}:**",
            f"👥 Пдп: {subs}",
            f"💰 {DEFAULT_CURRENCY_NAME}: {curr}",
            f"📹 Видео: {vids}"]
@@ -430,9 +473,9 @@ async def cmd_myprofile(message: types.Message, bot: Bot, **kwargs):
         else:
             out.append("✅ Можно публиковать новое!")
     if ud.get('active_event'):
-        out.append(f"\n✨ <b>Активное событие:</b> {ud['active_event']['message']}")
+        out.append(f"\n✨ **Активное событие:** {ud['active_event']['message']}")
     await save_data_async(data)
-    await message.answer("\n".join(out), parse_mode="HTML")
+    await message.answer("\n".join(out), parse_mode="Markdown")
 
 async def cmd_achievements(message: types.Message, bot: Bot, **kwargs):
     data = load_data()
@@ -442,11 +485,11 @@ async def cmd_achievements(message: types.Message, bot: Bot, **kwargs):
         await message.answer("Пока нет достижений.")
         await save_data_async(data)
         return
-    txt = "🏆 <b>Ваши достижения:</b>\n\n"
+    txt = "🏆 **Ваши достижения:**\n\n"
     for aid in unlocked:
         if aid in achievements_definition:
             txt += f"- {achievements_definition[aid]['name']}\n"
-    txt += "\n🔍 <i>Неразблокированные (первые 3):</i>\n"
+    txt += "\n🔍 *Неразблокированные (первые 3):*\n"
     cnt = 0
     for aid, ad in achievements_definition.items():
         if aid not in unlocked:
@@ -455,7 +498,7 @@ async def cmd_achievements(message: types.Message, bot: Bot, **kwargs):
             if cnt >= 3:
                 break
     await save_data_async(data)
-    await message.answer(txt, parse_mode="HTML")
+    await message.answer(txt, parse_mode="Markdown")
 
 async def cmd_daily(message: types.Message, bot: Bot, **kwargs):
     data = load_data()
@@ -490,14 +533,14 @@ async def cmd_shop(message: types.Message, bot: Bot, **kwargs):
     data = load_data()
     ud = get_user_data(message.from_user.id, data, message.from_user.username or message.from_user.first_name)
     bal = ud.get('currency', 0)
-    txt = f"🛍️ <b>Магазин {BOT_NAME}</b>\nБаланс: {bal} {DEFAULT_CURRENCY_NAME}\n\n"
+    txt = f"🛍️ **Магазин {BOT_NAME}**\nБаланс: {bal} {DEFAULT_CURRENCY_NAME}\n\n"
     kb_rows = []
     for item_id, item in shop_items.items():
-        txt += f"🔹 <b>{item['name']}</b> - {item['price']} {DEFAULT_CURRENCY_NAME}\n   <i>{item['description']}</i>\n\n"
+        txt += f"🔹 **{item['name']}** - {item['price']} {DEFAULT_CURRENCY_NAME}\n   *{item['description']}*\n\n"
         kb_rows.append([InlineKeyboardButton(text=f"Купить {item['name']} ({item['price']})", callback_data=f"shop_buy:{item_id}")])
     markup = InlineKeyboardMarkup(inline_keyboard=kb_rows) if kb_rows else None
     await save_data_async(data)
-    await message.answer(txt, parse_mode="HTML", reply_markup=markup)
+    await message.answer(txt, parse_mode="Markdown", reply_markup=markup)
 
 async def cb_shop_buy(query: types.CallbackQuery, bot: Bot, **kwargs):
     await query.answer()
@@ -544,9 +587,9 @@ async def cb_shop_buy(query: types.CallbackQuery, bot: Bot, **kwargs):
 
 async def cmd_help(message: types.Message, bot: Bot, **kwargs):
     text = (
-        f"🌟 <b>{BOT_NAME}!</b>\n\n"
+        f"🌟 **{BOT_NAME}!**\n\n"
         "Публикуй видео, копи валюту и прокачивайся!\n\n"
-        "<b>Команды</b>:\n"
+        "**Команды:**\n"
         "🎬 /addvideo <название>\n"
         "🏆 /leaderboard  /leaderboardpic\n"
         "👤 /myprofile\n"
@@ -556,12 +599,8 @@ async def cmd_help(message: types.Message, bot: Bot, **kwargs):
         "🔍 /checksub - проверить подписку на канал\n"
         "❓ /help\n\n"
         f"Механика: публикация раз в {COOLDOWN_HOURS:.1f} ч. Популярность зависит от заголовка, слов-ключей и удачи. Есть события и магазин.\n\n"
-        "<b>Админ команды:</b>\n"
-        "🔧 /disablesub - отключить проверку подписки\n"
-        "🔧 /enablesub <канал> - включить проверку подписки\n"
-        "🔧 /botstats - статистика бота"
     )
-    await message.answer(text, parse_mode="HTML")
+    await message.answer(text, parse_mode="Markdown")
 
 async def cmd_checksub(message: types.Message, bot: Bot, **kwargs):
     if not CHANNEL_ID:
@@ -718,9 +757,9 @@ async def admin_stats(message: types.Message, bot: Bot, **kwargs):
     ts = sum(i.get('subscribers', 0) for i in data.values())
     tv = sum(i.get('video_count', 0) for i in data.values())
     tc = sum(i.get('currency', 0) for i in data.values())
-    txt = (f"📊 <b>Стата {BOT_NAME}:</b>\n\n"
+    txt = (f"📊 **Стата {BOT_NAME}:**\n\n"
            f"👥 Юзеров: {tu}\n▶️ Видео: {tv}\n📈 Сумма пдп: {ts}\n💰 Сумма валюты: {tc} {DEFAULT_CURRENCY_NAME}")
-    await message.answer(txt, parse_mode="HTML")
+    await message.answer(txt, parse_mode="Markdown")
 
 async def main():
     if not BOT_TOKEN:
