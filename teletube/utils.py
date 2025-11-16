@@ -1,6 +1,7 @@
 import os
 import random
 from typing import Dict, Any, Optional, List
+import html
 from .config import (
     KEYWORDS_FILE, KEYWORD_BONUS_POINTS,
     POPULARITY_RANDOM_MIN, POPULARITY_RANDOM_MAX,
@@ -81,3 +82,14 @@ def get_random_event(user_subscribers: int) -> Optional[Dict[str, Any]]:
                 "message": f"⚡ Ускорение: кулдаун уменьшен на {random.randint(1, 3)} часа!"}
 
     return None
+
+
+def escape_html(text: str) -> str:
+    """Escape HTML special characters in `text` to safely use with Telegram `parse_mode='HTML'`.
+
+    Uses Python's built-in `html.escape` to replace &, <, >, and optionally quotes.
+    Ensures that user-generated strings will not break bot HTML formatting.
+    """
+    if text is None:
+        return ""
+    return html.escape(str(text), quote=False)

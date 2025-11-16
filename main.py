@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from aiogram import Bot, Dispatcher
+from aiogram.filters import Command
 
 from teletube.config import BOT_TOKEN, LOG_LEVEL_STR, BOT_NAME
 from teletube.handlers import (
@@ -24,20 +25,20 @@ async def main():
     bot = Bot(token=BOT_TOKEN)
     dp = Dispatcher()
 
-    dp.message.register(cmd_start, commands=["start"])
-    dp.message.register(cmd_help, commands=["help", "info"])
-    dp.message.register(cmd_addvideo, commands=["addvideo", "add", "video", "newvideo", "publishvideo", "publish"])
-    dp.message.register(cmd_leaderboard, commands=["leaderboard", "lp"])
-    dp.message.register(cmd_leaderboardpic, commands=["leaderboardpic", "lppic"])
-    dp.message.register(cmd_myprofile, commands=["myprofile"])
-    dp.message.register(cmd_achievements, commands=["achievements"])
-    dp.message.register(cmd_daily, commands=["daily"])
-    dp.message.register(cmd_shop, commands=["shop"])
+    dp.message.register(cmd_start, Command(commands=["start"]))
+    dp.message.register(cmd_help, Command(commands=["help", "info"]))
+    dp.message.register(cmd_addvideo, Command(commands=["addvideo", "add", "video", "newvideo", "publishvideo", "publish"]))
+    dp.message.register(cmd_leaderboard, Command(commands=["leaderboard", "lp"]))
+    dp.message.register(cmd_leaderboardpic, Command(commands=["leaderboardpic", "lppic"]))
+    dp.message.register(cmd_myprofile, Command(commands=["myprofile"]))
+    dp.message.register(cmd_achievements, Command(commands=["achievements"]))
+    dp.message.register(cmd_daily, Command(commands=["daily"]))
+    dp.message.register(cmd_shop, Command(commands=["shop"]))
 
-    dp.message.register(admin_add_currency, commands=["CHEATaddcoins"])
-    dp.message.register(admin_add_subs, commands=["CHEATaddsub"])
-    dp.message.register(admin_delete_db, commands=["CHEATDeleteDatabase"])
-    dp.message.register(admin_stats, commands=["botstats"])
+    dp.message.register(admin_add_currency, Command(commands=["CHEATaddcoins"]))
+    dp.message.register(admin_add_subs, Command(commands=["CHEATaddsub"]))
+    dp.message.register(admin_delete_db, Command(commands=["CHEATDeleteDatabase"]))
+    dp.message.register(admin_stats, Command(commands=["botstats"]))
 
     dp.callback_query.register(cb_shop_buy, lambda c: c.data and c.data.startswith("shop_buy:"))
 

@@ -1,5 +1,6 @@
 from typing import Dict, Any, List
 from .config import DEFAULT_CURRENCY_NAME
+from .utils import escape_html
 import logging
 logger = logging.getLogger(__name__)
 
@@ -36,10 +37,10 @@ async def check_and_grant_achievements(user_data: Dict[str, Any], bot, chat_id: 
             user_data.setdefault('achievements_unlocked', []).append(aid)
             rc = adef.get('reward_coins', 0)
             user_data['currency'] = user_data.get('currency', 0) + rc
-            text = f"🏆 Новое достижение: <b>{adef['name']}</b>! (+{rc} {DEFAULT_CURRENCY_NAME})"
+            text = f"🏆 Новое достижение: <b>{escape_html(adef['name'])}</b>! (+{rc} {escape_html(DEFAULT_CURRENCY_NAME)})"
             newly.append(text)
             try:
-                await bot.send_message(chat_id=chat_id, text=text)
+                await bot.send_message(chat_id=chat_id, text=text, parse_mode="HTML")
             except Exception as e:
                 logger.error("notify achievement error: %s", e)
     return newly

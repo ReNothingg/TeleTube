@@ -135,3 +135,9 @@ python main.py
 ## Лицензия
 
 Этот проект распространяется под лицензией MIT. Подробную информацию вы найдете в файле [LICENSE](LICENSE).
+
+```bash
+cd TeleTube
+git pull
+python main.py
+```

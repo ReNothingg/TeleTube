@@ -13,11 +13,11 @@ from aiogram.types import (
     ReplyKeyboardMarkup, KeyboardButton,
     InlineKeyboardButton, InlineKeyboardMarkup, FSInputFile
 )
-from aiogram.filters import Command
+# Note: Command filter isn't needed inside handlers, it's used in `main.py` to register handlers
 
 from .config import BOT_NAME, COOLDOWN_HOURS, POPULARITY_THRESHOLD_BONUS, NEGATIVE_POPULARITY_THRESHOLD, DEFAULT_CURRENCY_NAME, LEADERBOARD_IMAGE_FILE, CREATOR_ID, shop_items, DAILY_BONUS_AMOUNT, DAILY_BONUS_STREAK_MULTIPLIER, DATABASE_FILE
 from .db import load_data, save_data_async, get_user_data, schedule_cooldown_notification, _inmemory_tasks
-from .utils import evaluate_video_popularity, get_random_event
+from .utils import evaluate_video_popularity, get_random_event, escape_html
 from .achievements import check_and_grant_achievements
 from .config import BOT_TOKEN
 
@@ -36,7 +36,7 @@ async def cmd_start(message: types.Message, bot: Bot, **kwargs):
         [KeyboardButton(text="/leaderboard"), KeyboardButton(text="/achievements")],
         [KeyboardButton(text="/daily"), KeyboardButton(text="/help")]
     ], resize_keyboard=True)
-    await message.answer(f"🚀 Привет, {message.from_user.first_name}! Ты в игре {BOT_NAME}!\nИспользуй /help или кнопки.", reply_markup=kb)
+    await message.answer(f"🚀 Привет, {escape_html(message.from_user.first_name or '')}! Ты в игре <b>{escape_html(BOT_NAME)}</b>!\nИспользуй /help или кнопки.", reply_markup=kb, parse_mode="HTML")
 
 
 async def cmd_addvideo(message: types.Message, bot: Bot, **kwargs):
@@ -69,7 +69,7 @@ async def cmd_addvideo(message: types.Message, bot: Bot, **kwargs):
     pop_score = evaluate_video_popularity(video_title, base_popularity_modifier=event_mod, user_subs=ud.get('subscribers', 0))
     subs_change = pop_score
     bonus_subs = 0
-    msg_parts = [f"🎬 {ud['username']}, «{video_title}» опубликовано!"]
+    msg_parts = [f"🎬 <b>{escape_html(ud.get('username',''))}</b>, «<b>{escape_html(video_title)}</b>» опубликовано!"]
     if msgs:
         msg_parts.extend(msgs)
 
@@ -105,7 +105,7 @@ async def cmd_addvideo(message: types.Message, bot: Bot, **kwargs):
         if new_ev['type'] == 'currency_bonus':
             bonus_amount = new_ev['amount']
             ud['currency'] = ud.get('currency', 0) + bonus_amount
-            msg_parts.append(f"\n🔔 Событие: {new_ev['message']}")
+            msg_parts.append(f"\n🔔 Событие: {escape_html(new_ev['message'])}")
         elif new_ev['type'] == 'cooldown_reduction':
             reduction_hours = new_ev['hours']
             current_cooldown = ud.get('last_used_timestamp', 0.0)
@@ -119,10 +119,11 @@ async def cmd_addvideo(message: types.Message, bot: Bot, **kwargs):
 
     ach_msgs = await check_and_grant_achievements(ud, bot, message.chat.id)
     if ach_msgs:
+        # achievements messages already may contain HTML formatting, extend as-is
         msg_parts.extend(ach_msgs)
 
     await save_data_async(data)
-    await message.answer("\n".join(msg_parts))
+    await message.answer("\n".join(msg_parts), parse_mode="HTML")
 
 
 async def cmd_leaderboard(message: types.Message, bot: Bot, **kwargs):
@@ -131,13 +132,13 @@ async def cmd_leaderboard(message: types.Message, bot: Bot, **kwargs):
         await message.answer("🏆 В боте пока нет данных.")
         return
     users = sorted(data.values(), key=lambda u: u.get('subscribers', 0), reverse=True)
-    msg = "🏆 **Топеры:**\n\n"
+    msg = "🏆 <b>Топеры:</b>\n\n"
     shown = 0
     for u in users:
         if shown >= 15: break
-        msg += f"{shown+1}. {u.get('username','N/A')} - {u.get('subscribers',0)} пдп. (видео: {u.get('video_count',0)})\n"
+        msg += f"{shown+1}. {escape_html(u.get('username','N/A'))} - {escape_html(u.get('subscribers',0))} пдп. (видео: {escape_html(u.get('video_count',0))})\n"
         shown += 1
-    await message.answer(msg)
+    await message.answer(msg, parse_mode="HTML")
 
 
 async def cmd_leaderboardpic(message: types.Message, bot: Bot, **kwargs):
@@ -183,7 +184,7 @@ async def cmd_myprofile(message: types.Message, bot: Bot, **kwargs):
     curr = ud.get('currency', 0)
     tot = ud.get('total_subs_from_videos', 0)
     avg = (tot / vids) if vids > 0 else 0.0
-    out = [f"👤 **Твой профиль, {uname}:**",
+    out = [f"👤 <b>Твой профиль, {escape_html(uname)}:</b>",
            f"👥 Пдп: {subs}",
            f"💰 {DEFAULT_CURRENCY_NAME}: {curr}",
            f"📹 Видео: {vids}"]
@@ -204,9 +205,9 @@ async def cmd_myprofile(message: types.Message, bot: Bot, **kwargs):
         else:
             out.append("✅ Можно публиковать новое!")
     if ud.get('active_event'):
-        out.append(f"\n✨ **Активное событие:** {ud['active_event']['message']}")
+        out.append(f"\n✨ <b>Активное событие:</b> {escape_html(ud['active_event']['message'])}")
     await save_data_async(data)
-    await message.answer("\n".join(out), parse_mode="Markdown")
+    await message.answer("\n".join(out), parse_mode="HTML")
 
 
 async def cmd_achievements(message: types.Message, bot: Bot, **kwargs):
@@ -217,23 +218,23 @@ async def cmd_achievements(message: types.Message, bot: Bot, **kwargs):
         await message.answer("Пока нет достижений.")
         await save_data_async(data)
         return
-    txt = "🏆 **Ваши достижения:**\n\n"
+    txt = "🏆 <b>Ваши достижения:</b>\n\n"
     from .achievements import achievements_definition
     for aid in unlocked:
         if aid in achievements_definition:
-            txt += f"- {achievements_definition[aid]['name']}\n"
-    txt += "\n🔍 *Неразблокированные (первые 3):*\n"
+            txt += f"- {escape_html(achievements_definition[aid]['name'])}\n"
+    txt += "\n🔍 <i>Неразблокированные (первые 3):</i>\n"
     cnt = 0
     # find first 3 locked
     from .achievements import achievements_definition
     for aid, ad in achievements_definition.items():
         if aid not in unlocked:
-            txt += f"- ❓ {ad['name']}\n"
+            txt += f"- ❓ {escape_html(ad['name'])}\n"
             cnt += 1
             if cnt >= 3:
                 break
     await save_data_async(data)
-    await message.answer(txt, parse_mode="Markdown")
+    await message.answer(txt, parse_mode="HTML")
 
 
 async def cmd_daily(message: types.Message, bot: Bot, **kwargs):
@@ -263,22 +264,22 @@ async def cmd_daily(message: types.Message, bot: Bot, **kwargs):
     res = f"🎁 Ежедневный бонус: +{bonus} {DEFAULT_CURRENCY_NAME}!\n🔥 Ваш стрик: {streak} дн."
     if ach:
         res += "\n" + "\n".join(ach)
-    await message.answer(res)
+    await message.answer(res, parse_mode="HTML")
 
 
 async def cmd_shop(message: types.Message, bot: Bot, **kwargs):
     data = load_data()
     ud = get_user_data(message.from_user.id, data, message.from_user.username or message.from_user.first_name)
     bal = ud.get('currency', 0)
-    txt = f"🛍️ **Магазин {BOT_NAME}**\nБаланс: {bal} {DEFAULT_CURRENCY_NAME}\n\n"
+    txt = f"🛍️ <b>Магазин {escape_html(BOT_NAME)}</b>\nБаланс: {escape_html(bal)} {escape_html(DEFAULT_CURRENCY_NAME)}\n\n"
     kb_rows = []
     from .config import shop_items
     for item_id, item in shop_items.items():
-        txt += f"🔹 **{item['name']}** - {item['price']} {DEFAULT_CURRENCY_NAME}\n   *{item['description']}*\n\n"
+        txt += f"🔹 <b>{escape_html(item['name'])}</b> - {escape_html(item['price'])} {escape_html(DEFAULT_CURRENCY_NAME)}\n   <i>{escape_html(item['description'])}</i>\n\n"
         kb_rows.append([InlineKeyboardButton(text=f"Купить {item['name']} ({item['price']})", callback_data=f"shop_buy:{item_id}")])
     markup = InlineKeyboardMarkup(inline_keyboard=kb_rows) if kb_rows else None
     await save_data_async(data)
-    await message.answer(txt, parse_mode="Markdown", reply_markup=markup)
+    await message.answer(txt, parse_mode="HTML", reply_markup=markup)
 
 
 async def cb_shop_buy(query: types.CallbackQuery, bot: Bot, **kwargs):
@@ -304,7 +305,7 @@ async def cb_shop_buy(query: types.CallbackQuery, bot: Bot, **kwargs):
         return
     ud['currency'] -= price
     effect = item['effect']
-    app_msg = f"✅ Куплено «{item['name']}» за {price} {DEFAULT_CURRENCY_NAME}.\n"
+    app_msg = f"✅ Куплено «{escape_html(item['name'])}» за {escape_html(price)} {escape_html(DEFAULT_CURRENCY_NAME)}.\n"
     if effect['type'] == 'event_modifier' and effect.get('target') == 'next_video_popularity':
         ud['active_event'] = {
             "type": "event_modifier",
@@ -323,24 +324,24 @@ async def cb_shop_buy(query: types.CallbackQuery, bot: Bot, **kwargs):
         ud['cooldown_notification_task'] = None
     await check_and_grant_achievements(ud, bot, query.message.chat.id)
     await save_data_async(data)
-    await query.message.edit_text(app_msg)
+    await query.message.edit_text(app_msg, parse_mode="HTML")
 
 
 async def cmd_help(message: types.Message, bot: Bot, **kwargs):
     text = (
-        f"🌟 **{BOT_NAME}!**\n\n"
+        f"🌟 <b>{escape_html(BOT_NAME)}!</b>\n\n"
         "Публикуй видео, копи валюту и прокачивайся!\n\n"
-        "**Команды:**\n"
-        "🎬 /addvideo <название>\n"
-        "🏆 /leaderboard  /leaderboardpic\n"
-        "👤 /myprofile\n"
-        "🛍️ /shop\n"
-        "🎁 /daily\n"
-        "🏅 /achievements\n"
-        "❓ /help\n\n"
+        "<b>Команды:</b>\n"
+        f"🎬 <code>/addvideo {escape_html('<название>')}</code>\n"
+        f"🏆 <code>/leaderboard</code>  <code>/leaderboardpic</code>\n"
+        f"👤 <code>/myprofile</code>\n"
+        f"🛍️ <code>/shop</code>\n"
+        f"🎁 <code>/daily</code>\n"
+        f"🏅 <code>/achievements</code>\n"
+        f"❓ <code>/help</code>\n\n"
         f"Механика: публикация раз в {COOLDOWN_HOURS:.1f} ч. Популярность зависит от заголовка, слов-ключей и удачи. Есть события и магазин.\n\n"
     )
-    await message.answer(text, parse_mode="Markdown")
+    await message.answer(text, parse_mode="HTML")
 
 
 # Admin commands
@@ -443,6 +444,6 @@ async def admin_stats(message: types.Message, bot: Bot, **kwargs):
     ts = sum(i.get('subscribers', 0) for i in data.values())
     tv = sum(i.get('video_count', 0) for i in data.values())
     tc = sum(i.get('currency', 0) for i in data.values())
-    txt = (f"📊 **Стата {BOT_NAME}:**\n\n"
+    txt = (f"📊 <b>Стата {escape_html(BOT_NAME)}:</b>\n\n"
            f"👥 Юзеров: {tu}\n▶️ Видео: {tv}\n📈 Сумма пдп: {ts}\n💰 Сумма валюты: {tc} {DEFAULT_CURRENCY_NAME}")
-    await message.answer(txt, parse_mode="Markdown")
+    await message.answer(txt, parse_mode="HTML")
